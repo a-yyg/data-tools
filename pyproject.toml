@@ -1,0 +1,23 @@
+[project]
+name = "data-tools"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+  "matplotlib>=3.10.7",
+  "numpy>=2.3.4",
+  "rosbags>=0.11.0",
+  "scipy>=1.16.3",
+]
+
+[project.scripts]
+ros2csv = "data_tools.ros2csv:main"
+csvgraph = "data_tools.csvgraph:main"
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
