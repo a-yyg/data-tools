@@ -209,10 +209,10 @@ def parse_args():
         default="ns",
         help="Time unit",
     )
-    # parser.add_argument(
-    #     "-t", "--topics", type=str, nargs="+", help="Topic(s) to analyze"
-    # )
-    parser.add_argument("-t", "--title", type=str, nargs="+", help="Title of the plot")
+    parser.add_argument(
+        "-t", "--topics", type=str, nargs="+", help="Topic(s) to analyze"
+    )
+    parser.add_argument("--title", type=str, nargs="+", help="Title of the plot")
     parser.add_argument(
         "-p", "--plot", type=str, choices=["linear", "diff", "detrend", "drift"]
     )

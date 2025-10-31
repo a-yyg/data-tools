@@ -71,10 +71,18 @@ def main():
         args.topics,
     )
     spamwriter = csv.writer(sys.stdout)
-    spamwriter.writerow(["Index", *list(data.keys())])
-    for _, timestamps in data.items():
-        for i, timestamp in enumerate(timestamps):
-            spamwriter.writerow([i, timestamp.to_ns()])
+    topics = list(data.keys())
+    n = max(len(data[topic]) for topic in topics)
+    spamwriter.writerow(["Index", *topics])
+    for i in range(n):
+        row = [i]
+        for topic in topics:
+            timestamps = data[topic]
+            if i < len(timestamps):
+                row.append(timestamps[i].to_ns())
+            else:
+                row.append("")
+        spamwriter.writerow(row)
 
 
 if __name__ == "__main__":
