@@ -36,4 +36,8 @@ def to_stamp(msg: object) -> Timestamp:
             )
             return to_stamp(msg.header.stamp)
         case _:
-            raise ValueError(f"Unsupported message: {msg} ({get_type(msg)})")
+            if hasattr(msg, "header"):
+                if hasattr(msg.header, "stamp"):
+                    return to_stamp(msg.header.stamp)
+            else:
+                raise ValueError(f"Unsupported message: {msg} ({get_type(msg)})")
