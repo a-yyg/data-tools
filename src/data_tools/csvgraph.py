@@ -58,9 +58,9 @@ class UnitFactor:
 class TimestampAnalyzer:
     def __init__(self, ts: npt.NDArray[Any], unit: TimeUnit = TimeUnit.NANOSECONDS):
         self.ts = ts
-        self.ts_diff = None
-        self.ts_detrended = None
-        self.ts_drift = None
+        self.ts_diff: npt.NDArray[Any] | None = None
+        self.ts_detrended: npt.NDArray[Any] | None = None
+        self.ts_drift: npt.NDArray[Any] | None = None
         self.unit = unit
         self.factor = UnitFactor(unit)
         self._plot = "ts"
@@ -82,6 +82,10 @@ class TimestampAnalyzer:
         self.unit = TimeUnit.NANOSECONDS
         return self
 
+    @property
+    def t(self):
+        return self.__dict__[self._plot]
+
     def linear(self):
         self._plot = "ts"
         return self
@@ -89,6 +93,17 @@ class TimestampAnalyzer:
     def diff(self):
         self.ts_diff = np.diff(self.ts)
         self._plot = "ts_diff"
+        return self
+
+    def mdiff(self, expected: float):
+        self.ts_mdiff = np.diff(self.ts)
+        for i in range(len(self.ts_mdiff)):
+            self.ts_mdiff[i] -= expected
+            while self.ts_mdiff[i] > expected / 2:
+                self.ts_mdiff[i] -= expected
+            while self.ts_mdiff[i] < -expected / 2:
+                self.ts_mdiff[i] += expected
+        self._plot = "ts_mdiff"
         return self
 
     def detrend(self):
@@ -143,13 +158,46 @@ def parse_csv(reader) -> Tuple[str, List[float]]:
             continue
         if title == "":
             title = row[1]
-            assert(isinstance(title, str))
+            assert isinstance(title, str)
             continue
         ts.append(float(row[1]))
     return title, ts
 
-
 def analyze_ts(
+    ts: List[float],
+    plot: str,
+    unit: TimeUnit,
+    expected: float,
+    rm_outliers: int,
+) -> Tuple[List[float], List[float]]:
+    analyzer = TimestampAnalyzer(np.array(ts), unit)
+    if rm_outliers > 0:
+        outliers = analyzer.diff().outliers(rm_outliers)
+        outliers = [i for (i, _) in outliers]
+        analyzer.hide_indices(outliers)
+    match plot:
+        case "linear":
+            return analyzer.linear().sec().t
+        case "diff":
+            return analyzer.diff().msec().t
+        case "mdiff":
+            return analyzer.mdiff(
+                UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)
+            ).msec().t
+        case "detrend":
+            return analyzer.detrend().msec().t
+        case "drift":
+            return analyzer.drift(
+                UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)
+            ).msec().t
+        case "drift":
+            return analyzer.drift(
+                UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)
+            ).msec().t
+        case _:
+            raise ValueError(f"Invalid plot type: {plot}")
+
+def plot_ts(
     ts: List[float],
     title: str,
     plot: str,
@@ -160,9 +208,6 @@ def analyze_ts(
     rm_outliers: int,
 ):
     analyzer = TimestampAnalyzer(np.array(ts), unit)
-    # base_name = csv_file.stem
-    # ts_outliers = np.array(ts)[outliers]
-    # print(f"Outliers for {base_name}: {ts_outliers}")
     if rm_outliers > 0:
         outliers = analyzer.diff().outliers(rm_outliers)
         outliers = [i for (i, _) in outliers]
@@ -174,29 +219,21 @@ def analyze_ts(
         case "diff":
             title = f"{title} Difference"
             analyzer.diff().msec().plot(filepath=output_file, title=title)
+        case "mdiff":
+            title = f"{title} Difference"
+            analyzer.mdiff(
+                UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)
+            ).msec().plot(filepath=output_file, title=title)
         case "detrend":
             title = f"{title} Detrended"
             analyzer.detrend().msec().plot(filepath=output_file, title=title)
         case "drift":
             title = f"{title} Drift"
-            analyzer.drift(UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)).msec().plot(filepath=output_file, title=title)
+            analyzer.drift(
+                UnitFactor(TimeUnit.MILLISECONDS).convert(unit)(expected)
+            ).msec().plot(filepath=output_file, title=title)
         case _:
             raise ValueError(f"Invalid plot type: {plot}")
-    # analyzer.linear().plot(
-    #     Path(output_dir, f"{base_name}_timestamp_plot.png"),
-    #     title=f"{title} Timestamp",
-    # ).diff().plot(
-    #     Path(output_dir, f"{base_name}_timestamp_diff_plot.png"),
-    #     title=f"{title} Difference",
-    # ).detrend().plot(
-    #     Path(output_dir, f"{base_name}_timestamp_detrended_plot.png"),
-    #     title=f"{title} Detrended",
-    # ).drift(
-    #     expected * 1e6
-    # ).plot(
-    #     Path(output_dir, f"{base_name}_timestamp_drift_plot.png"),
-    #     title=f"{title} - ({expected} ms) * x",
-    # )
 
 
 def parse_args():
@@ -214,7 +251,10 @@ def parse_args():
     )
     parser.add_argument("--title", type=str, nargs="+", help="Title of the plot")
     parser.add_argument(
-        "-p", "--plot", type=str, choices=["linear", "diff", "detrend", "drift"]
+        "-p",
+        "--plot",
+        type=str,
+        choices=["linear", "diff", "mdiff", "detrend", "drift"],
     )
     parser.add_argument(
         "-e",
@@ -224,8 +264,16 @@ def parse_args():
         default=200,
     )
     parser.add_argument(
-        "-r", "--rm_outliers", type=float, help="Remove outliers above this many std deviations",
-        default=0
+        "-r",
+        "--rm_outliers",
+        type=float,
+        help="Remove outliers above this many std deviations",
+        default=0,
+    )
+    parser.add_argument(
+        "--tocsv",
+        action="store_true",
+        help="Output to CSV file",
     )
     # parser.add_argument("-o", "--output_dir", type=str, help="Output directory")
     parser.add_argument("--stdin", action="store_true", help="Input from stdin")
@@ -251,18 +299,33 @@ def main():
     else:
         raise ValueError("Not implemented")
     reader = csv.reader(input_file)
-    title, ts = parse_csv(reader)
-    if args.title:
-        title = " ".join(args.title)
-    analyze_ts(
-        ts,
-        title,
-        args.plot,
-        output_file,
-        units[args.unit],
-        args.expected,
-        rm_outliers=args.rm_outliers,
-    )
+    if args.tocsv:
+        writer = csv.writer(output_file)
+        title, ts = parse_csv(reader)
+        t = analyze_ts(
+            ts,
+            args.plot,
+            units[args.unit],
+            args.expected,
+            rm_outliers=args.rm_outliers,
+        )
+        header = f"{title} {args.plot}"
+        writer.writerow([header])
+        for value in t:
+            writer.writerow([value])
+    else:
+        title, ts = parse_csv(reader)
+        if args.title:
+            title = " ".join(args.title)
+        plot_ts(
+            ts,
+            title,
+            args.plot,
+            output_file,
+            units[args.unit],
+            args.expected,
+            rm_outliers=args.rm_outliers,
+        )
 
 
 if __name__ == "__main__":
