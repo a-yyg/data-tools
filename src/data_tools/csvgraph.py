@@ -279,9 +279,9 @@ def plot_ts(
     plot_titles = {
         "linear": f"{title} Timestamp",
         "diff": f"{title} Difference",
-        "mdiff": f"{title} Difference",
+        "mdiff": f"{title} Difference (M)",
+        "drift": f"{title} Drift",
         "detrend": f"{title} Detrended",
-        "detrended": f"{title} Detrended",
     }
 
     if force_title:
