@@ -407,10 +407,23 @@ def parse_args():
         default=80,
     )
     parser.add_argument(
+        "--figsize",
+        type=float,
+        nargs=2,
+        metavar=("WIDTH", "HEIGHT"),
+        help="Figure size in inches (width height)",
+        default=None,
+    )
+    parser.add_argument(
         "-f",
         "--force-title",
         action="store_true",
         help="Force title for plot",
+    )
+    parser.add_argument(
+        "--eps",
+        action="store_true",
+        help="Output to EPS file",
     )
     return parser.parse_args()
 
@@ -449,6 +462,9 @@ def main():
     if args.dpi:
         plt.rcParams['figure.dpi'] = args.dpi
 
+    if args.figsize:
+        plt.rcParams['figure.figsize'] = args.figsize
+
     # Validate file-topics if provided
     if args.file_topics:
         if len(args.file_topics) != len(input_files):
@@ -484,11 +500,11 @@ def main():
         for unit in args.file_output_units:
             if unit not in valid_units:
                 raise ValueError(f"Invalid unit '{unit}'. Must be one of: {valid_units}")
-    
+
     # Validate mutually exclusive output options
     if args.tocsv and args.stats:
         raise ValueError("Cannot use both --tocsv and --stats together")
-    
+
     try:
         if args.tocsv:
                 if len(input_files) > 1:
@@ -526,7 +542,7 @@ def main():
         elif args.stats:
             # Statistics mode - print mean and std dev
             all_datasets = []
-            
+
             for idx, (file_handle, csv_name) in enumerate(zip(input_files, csv_names)):
                 reader = csv.reader(file_handle)
                 # Trim data after header according to start and end index
@@ -557,7 +573,7 @@ def main():
                     file_input_unit = units[args.file_units[idx]]
                 else:
                     file_input_unit = units[args.unit]
-                
+
                 if args.file_output_units:
                     file_output_unit = units[args.file_output_units[idx]]
                 else:
@@ -576,14 +592,14 @@ def main():
                         Decimal(str(args.expected)),
                         rm_outliers=args.rm_outliers,
                     )
-                    
+
                     # Store file info along with dataset and units
                     all_datasets.append((topic_name, analyzed_data, csv_name, len(input_files), file_output_unit))
-            
+
             # Determine how many topics are being plotted across all files
             unique_topics = set(topic_name for topic_name, _, _, _, _ in all_datasets)
             num_topics = len(unique_topics)
-            
+
             # Now create final dataset list with proper labels
             final_datasets = []
             for topic_name, analyzed_data, csv_name, num_files, file_output_unit in all_datasets:
@@ -600,9 +616,9 @@ def main():
                 else:
                     # Single file, single topic: no label needed, use topic name
                     label = topic_name
-                
+
                 final_datasets.append((label, analyzed_data, file_output_unit))
-            
+
             # Override labels if custom labels provided
             if args.labels:
                 if len(args.labels) != len(final_datasets):
@@ -614,19 +630,29 @@ def main():
                     (custom_label, analyzed_data, file_output_unit)
                     for (_, analyzed_data, file_output_unit), custom_label in zip(final_datasets, args.labels)
                 ]
-            
+
             # Print statistics for each dataset
             for label, data, output_unit in final_datasets:
                 data_float = [float(d) for d in data]
                 mean = np.mean(data_float)
                 std = np.std(data_float)
+                var = np.var(data_float)
                 min_val = np.min(data_float)
                 max_val = np.max(data_float)
+                rms = np.sqrt(np.mean(np.square(data_float)))
+                perc_95 = np.percentile(data_float, 95)
+                perc_99 = np.percentile(data_float, 99)
+                mad = np.median(np.abs(data_float - np.median(data_float)))
                 print(f"Dataset: {label}")
                 print(f"  Mean: {mean} {output_unit.value[1]}")
                 print(f"  Std Dev: {std} {output_unit.value[1]}")
+                print(f"  Variance: {var} {output_unit.value[1]}^2")
                 print(f"  Min: {min_val} {output_unit.value[1]}")
                 print(f"  Max: {max_val} {output_unit.value[1]}")
+                print(f"  RMS: {rms} {output_unit.value[1]}")
+                print(f"  95th Percentile: {perc_95} {output_unit.value[1]}")
+                print(f"  99th Percentile: {perc_99} {output_unit.value[1]}")
+                print(f"  MAD: {mad} {output_unit.value[1]}")
                 print()
         else:
             # Collect all datasets to plot
@@ -747,7 +773,10 @@ def main():
                 plt.legend()  # pyright: ignore[reportUnknownMemberType]
 
             # Save and close plot
-            plt.savefig(output_file)  # pyright: ignore[reportUnknownMemberType]
+            if args.eps:
+                plt.savefig(output_file, format='eps')  # pyright: ignore[reportUnknownMemberType]
+            else:
+                plt.savefig(output_file)  # pyright: ignore[reportUnknownMemberType]
             plt.close()
     finally:
         # Close input files (only in non-stats mode, as stats mode already processed them)
