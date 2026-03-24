@@ -439,6 +439,11 @@ def parse_args():
         action="store_true",
         help="Output to EPS file",
     )
+    parser.add_argument(
+        "--pgf",
+        action="store_true",
+        help="Output to PGF file",
+    )
     return parser.parse_args()
 
 
@@ -518,6 +523,8 @@ def main():
     # Validate mutually exclusive output options
     if args.tocsv and args.stats:
         raise ValueError("Cannot use both --tocsv and --stats together")
+    if args.eps and args.pgf:
+        raise ValueError("Cannot use both --eps and --pgf together")
 
     try:
         if args.tocsv:
@@ -788,7 +795,9 @@ def main():
                 plt.legend()  # pyright: ignore[reportUnknownMemberType]
 
             # Save and close plot
-            if args.eps:
+            if args.pgf:
+                plt.savefig(output_file, format='pgf')  # pyright: ignore[reportUnknownMemberType]
+            elif args.eps:
                 plt.savefig(output_file, format='eps')  # pyright: ignore[reportUnknownMemberType]
             else:
                 plt.savefig(output_file)  # pyright: ignore[reportUnknownMemberType]
