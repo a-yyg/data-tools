@@ -128,7 +128,14 @@ class TimestampAnalyzer:
         self._plot = "ts_drift"
         return self
 
-    def plot(self, title: str, color: str = None, label: str = None, size: float = None):
+    def plot(
+        self,
+        title: str,
+        color: str = None,
+        label: str = None,
+        size: float = None,
+        x_label: str = "Index",
+    ):
         y = self.__dict__[self._plot]
         # Remove hidden indices
         y_filtered = [y[i] for i in range(len(y)) if i not in self.hidden]
@@ -137,7 +144,7 @@ class TimestampAnalyzer:
         x = np.arange(len(y_converted))
         plt.scatter(x, y_converted, s=size, color=color, label=label, zorder=len(plt.gca().collections))  # pyright: ignore[reportUnknownMemberType]
         # plt.title(title)  # pyright: ignore[reportUnknownMemberType]
-        plt.xlabel("Index")  # pyright: ignore[reportUnknownMemberType]
+        plt.xlabel(x_label)  # pyright: ignore[reportUnknownMemberType]
         # plt.ylabel(f"Timestamp ({self.unit.value[1]})")  # pyright: ignore[reportUnknownMemberType]
         plt.ylabel(f"{title} ({self.unit.value[1]})")  # pyright: ignore[reportUnknownMemberType]
         return self
@@ -258,7 +265,8 @@ def plot_ts(
     color: str = None,
     label: str = None,
     size: float = None,
-    force_title: bool = False
+    force_title: bool = False,
+    x_label: str = "Index",
 ):
     analyzer = TimestampAnalyzer(ts, from_unit)
     if rm_outliers > 0:
@@ -291,19 +299,19 @@ def plot_ts(
 
     match plot:
         case "linear":
-            analyzer.linear().plot(title=plot_title, color=color, label=label, size=size)
+            analyzer.linear().plot(title=plot_title, color=color, label=label, size=size, x_label=x_label)
         case "diff":
-            analyzer.diff().plot(title=plot_title, color=color, label=label, size=size)
+            analyzer.diff().plot(title=plot_title, color=color, label=label, size=size, x_label=x_label)
         case "mdiff":
             analyzer.mdiff(
                 UnitFactor(from_unit).convert(to_unit)(expected)
-            ).plot(title=plot_title, color=color, label=label, size=size)
+            ).plot(title=plot_title, color=color, label=label, size=size, x_label=x_label)
         case "detrend":
-            analyzer.detrend().plot(title=plot_title, color=color, label=label, size=size)
+            analyzer.detrend().plot(title=plot_title, color=color, label=label, size=size, x_label=x_label)
         case "drift":
             analyzer.drift(
                 UnitFactor(from_unit).convert(to_unit)(expected)
-            ).plot(title=plot_title, color=color, label=label, size=size)
+            ).plot(title=plot_title, color=color, label=label, size=size, x_label=x_label)
         case _:
             raise ValueError(f"Invalid plot type: {plot}")
 
@@ -351,6 +359,12 @@ def parse_args():
         type=str,
         nargs="+",
         help="Custom labels for legend (must match number of datasets)",
+    )
+    parser.add_argument(
+        "--x-label",
+        type=str,
+        default="Index",
+        help="Label for the x-axis",
     )
     parser.add_argument(
         "-p",
@@ -764,7 +778,8 @@ def main():
                     color=color,
                     label=label,
                     size=size,
-                    force_title=args.force_title
+                    force_title=args.force_title,
+                    x_label=args.x_label,
                 )
 
 
